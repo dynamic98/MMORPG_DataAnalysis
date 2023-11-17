@@ -1,5 +1,6 @@
 import os
 import json
+import numpy as np
 
 class ParticipantData:
     def __init__(self, participant:str):
@@ -31,23 +32,103 @@ class Log:
         log_stack = self.get_log_stack()
         for agent in log_stack:
             speed = self.get_speed(log_stack[agent]['position'])
-            distance = self.get_distance(self.cycles, agent)
+            boss_distance = self.get_bossDistance(self.cycles, agent)
             health = self.get_health(log_stack[agent]['health'])
             skillCount = self.get_skillCount(log_stack[agent]['skillInfo'])
-            dps = self.get_dps(log_stack[agent]['skillInfo'])
-            bosskill = self.get_bosskill(log_stack[agent]['skillInfo'])
-            death = self.get_death(log_stack[agent]['state'])
+            dps = self.get_dps(log_stack[agent]['skillInfo'], agent)
+            bosskill = self.get_bossKill()
+            death = self.get_death()
+            distanceWhenSkill = self.get_distanceWhenSkill(log_stack[agent]['skillInfo'])
+            totalPath = self.get_totalPath(log_stack[agent]['position'])
+            takeShield = self.get_takeShield(log_stack[agent]['shield'])
             
+
             
-            
+    def get_speed(self, log_position: list):
+        total_pathlength = 0        
+        for i in range(len(log_position)-1):
+            this_distance = self.distance(log_position[i], log_position[i+1])
+            total_pathlength += this_distance
+        
+        if not len(log_position) == 0:
+            return total_pathlength/len(log_position)
+        else:
+            return 0
+        
+    def get_bossDistance(self, cycles, agent:str):
+        alive_duration = len(self.get_log_stack()[agent]['position'])
+        total_bossDistance = 0
+        for i in alive_duration:
+            agent_position = cycles[i][agent]['position']
+            boss_position = cycles[i]['PatchwerkAgent']['position']
+            total_bossDistance += self.distance(agent_position, boss_position)
+        
+        if not alive_duration == 0:
+            return total_bossDistance/alive_duration
+        else:
+            return 0
     
+    def distance(self, pos1: list, pos2: list):
+        x1, y1, z1 = pos1
+        x2, y2, z2 = pos2
+        dx = (x1-x2)**2
+        dy = (y1-y2)**2
+        dz = (z1-z2)**2
+        return np.sqrt(dx+dy+dz)
+
+    def get_health(self, log_health):
+        return np.mean(log_health)
     
+    def get_skillCount(self, log_skillInfo):
+        return len(log_skillInfo)
+
+    def get_dps(self, log_skillInfo, agent):
+        total_damage = 0
+        alive_duration = len(self.get_log_stack()[agent]['position'])
+
+        skill_dict = { 
+            'Fireball_0_0': 5000,
+            'Pyroblast_0_1': 45000,
+            'RainOfFlames_0_2': 130000,
+            'HolyArrow_1_2': 5600,
+            'Backstab_2_0':25000,
+            'SnipingArrow_2_1':30000,
+            'HammeroftheRighteous_3_0':12598,
+            'Consecration_3_1': 29568
+            }
+        for i in log_skillInfo:
+            this_skill = i['skill_name']
+            if i['skill_name'] in list(skill_dict.keys()):
+                total_damage += skill_dict[this_skill]
+        if not alive_duration == 0:
+            return total_damage/alive_duration
+        else:
+            return 0
+    
+    def get_bossKill(self):
+        if self.result == 'EnemyWin':
+            return False
+        elif self.result == 'PlayerWin':
+            return True
+        elif self.result == 'Draw':
+            return False
+
+    def get_death(self):
+        if self.result == 'EnemyWin':
+            return True
+        else:
+            for agent in ['Mage', 'Priest','MeleeDealer','Tanker']:
+                if self.cycles[-1][agent]['state']:
+                    False
+                else:
+                    True
+
     def get_log_stack_dict(self):
         log_stack_dict = {'health':[], 'shield':[], 'skillInfo':[], 'position':[], 'state':[]}
         return log_stack_dict
     
     def get_log_dict(self):
-        log_dict = {'speed':None, 'distance':None, 'health':None, 'skillCount':None, 'dps':None, 'bosskill':None, 'death':None, 'distanceWhenSkill':None,
+        log_dict = {'speed':None, 'bossDistance':None, 'health':None, 'skillCount':None, 'dps':None, 'bosskill':None, 'death':None, 'distanceWhenSkill':None,
             'totalPath':None, 'takeShield':None, 'skillFrequency':None, 'distanceBTNagent':None, 'attackCount':None, 'attackLowHealth':None}
         return log_dict
     
